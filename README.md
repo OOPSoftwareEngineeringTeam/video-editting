@@ -1,11 +1,10 @@
-# KLTN: Video Analytics
+## Đồ án môn học Công nghệ phần mềm hướng đối tượng: Project Video Analytics
 
-***Nhóm sinh viên thực hiện (Hệ đại trà):***
+***Nhóm sinh viên thực hiện (Hệ đào tạo chất lượng cao):***
 
-
-- **Lương Hữu Tâm** - *18110347*
-- **Đỗ Quang Hùng** - *18110295*
-
+- **Mai Bảo Long** - *20110517*
+- **Phan Phạm Nghĩa** - *20110524*
+- **Hồ Thái Long** - *20161332*
 
 ## Công nghệ sử dụng
 
@@ -25,7 +24,11 @@
 
 **Các bước để tiến hành cài đặt**
 
-- Clone project từ github: https://github.com/HungDo007/video-editing
+- Clone project từ github: https://github.com/OOPSoftwareEngineeringTeam/video-editting.git
 - Sau khi clone, mở thư mục **video-editing/server/video-editing-api** run file _video-editing-api.sln_ để chạy backend
 - Mở Command Prompt tại thư mục **video-editing/client** và nhập _npm install_ để cài đặt các gói.
 - Nhập _npm start_ để khởi chạy chương trình.
+
+## Bản gốc project: https://github.com/HungDo007/video-editing
+- **Lương Hữu Tâm** 
+- **Đỗ Quang Hùng**
