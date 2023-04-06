@@ -1,0 +1,34 @@
+a {
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+}
+td,
+th {
+  text-align: center;
+}
+.MuiTableCell-head {
+  background-color: #ceebf9 !important;
+}
+tr.drop-over-downward td {
+  border-bottom: 2px dashed #1890ff;
+}
+
+tr.drop-over-upward td {
+  border-top: 2px dashed #1890ff;
+}
+.ant-popover-title {
+  min-width: unset !important;
+  text-align: center;
+}
+.ant-popover {
+  z-index: 1000000000000000000000000;
+}
