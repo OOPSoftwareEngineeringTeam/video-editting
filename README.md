@@ -30,5 +30,5 @@
 - Nhập _npm start_ để khởi chạy chương trình.
 
 ## Bản gốc project: https://github.com/HungDo007/video-editing
-- **Lương Hữu Tâm** 
+- **Lương Hữu Tâm**
 - **Đỗ Quang Hùng**
