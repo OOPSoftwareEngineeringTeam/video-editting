@@ -1,5 +1,3 @@
-name: Deploy .NET App to Heroku
-
 on:
   push:
     branches:
@@ -22,7 +20,7 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --configuration Release --no-restore
 
       - name: Test
         run: dotnet test --no-build --verbosity normal
@@ -31,9 +29,10 @@ jobs:
         run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
 
       - name: Deploy to Heroku
-        uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
+        uses: jctaveras/heroku-deploy@v1.0.8
+        env:
+          HEROKU_API_KEY: ${{secrets.HEROKU_API_KEY}}
+          HEROKU_APP_NAME: "video-editing-core"
+          HEROKU_EMAIL: "20110517@student.hcmute.edu.vn"
         with:
-          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
-          heroku_app_name: "video-editing-core" #Change this to your Heroku app's name
-          heroku_email: "20110517@student.hcmute.edu.vn" # Change this to your Heroku email
-          appdir: "." # The path to your app
+          args: --app-dir . --buildpack heroku/dotnet
