@@ -30,10 +30,12 @@ jobs:
       - name: Publish
         run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
 
-      - name: Deploy to Heroku
+      - name: Set up Heroku CLI
         uses: akhileshns/heroku-deploy@v3.12.12
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: "video-editing"
-          heroku_email: "20110517@student.hcmute.edu.vn"
-          appdir: "./video-editing-api/build"
+
+      - name: Deploy to Heroku
+        run: |
+          git remote add heroku https://git.heroku.com/video-editing.git
+          git subtree push --prefix video-editing-api/build heroku main
