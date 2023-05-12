@@ -4,7 +4,7 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /src
-COPY ["video-editing-api.csproj", "./"]
+COPY ["./video-editing-api/video-editing-api.csproj", "./"]
 RUN dotnet restore "./video-editing-api.csproj"
 COPY . .
 WORKDIR "/src/."
