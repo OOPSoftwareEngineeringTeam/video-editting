@@ -1,0 +1,39 @@
+name: Deploy .NET App to Heroku
+
+on:
+  push:
+    branches:
+      - master  # Change this to your default branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore
+
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+
+    - name: Publish
+      run: dotnet publish --configuration Release --no-build --output ./build
+
+    - name: Deploy to Heroku
+      uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
+      with:
+        heroku_api_key: ${{secrets.HEROKU_API_KEY}}
+        heroku_app_name: "video-editing-core" 
+        heroku_email: "20110517@student.hcmute.edu.vn" 
+        appdir: "." # The path to your app
