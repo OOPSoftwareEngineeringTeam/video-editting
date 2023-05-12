@@ -1,44 +1,39 @@
-name: Deploy to Heroku
+name: Deploy .NET App to Heroku
 
 on:
   push:
     branches:
-      - main # or your default branch
+      - main # Change this to your default branch
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      - name: Login to Heroku Container registry
-        env:
-          HEROKU_API_KEY: ${{secrets.HEROKU_API_KEY}}
-        run: docker login --username=_ --password=$HEROKU_API_KEY registry.heroku.com
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 5.0.x
 
-      - name: Build and push Docker image
-        env:
-          HEROKU_APP_NAME: video-editing-core
-        run: |
-          docker-compose build
-          docker tag yourservice:latest registry.heroku.com/$HEROKU_APP_NAME/web
-          docker push registry.heroku.com/$HEROKU_APP_NAME/web
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore
+
+      - name: Test
+        run: dotnet test --no-build --verbosity normal
+
+      - name: Publish
+        run: dotnet publish --configuration Release --no-build --output ./build
 
       - name: Deploy to Heroku
-        env:
-          HEROKU_API_KEY: ${{secrets.HEROKU_API_KEY}}
-          HEROKU_APP_NAME: your-heroku-app-name
-        run: |
-          curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
-          -d '{
-            "updates": [
-              {
-                "type": "web",
-                "docker_image": "'"$(docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}})"'"
-              }
-            ]
-          }' \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
-          -H "Authorization: Bearer $HEROKU_API_KEY"
+        uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
+        with:
+          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
+          heroku_app_name: "video-editing-core" #Change this to your Heroku app's name
+          heroku_email: "20110517@student.hcmute.edu.vn" # Change this to your Heroku email
+          appdir: "." # The path to your app
