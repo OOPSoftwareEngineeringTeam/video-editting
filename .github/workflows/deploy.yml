@@ -31,27 +31,9 @@ jobs:
         run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
 
       - name: Deploy to Heroku
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-          HEROKU_APP_NAME: "video-editing-core"
-        run: |
-          curl -n -X PATCH "https://api.heroku.com/apps/$HEROKU_APP_NAME/formation" \
-            -H "Authorization: Bearer $HEROKU_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{
-                  "updates": [
-                    {
-                      "type": "web",
-                      "docker_image": "heroku/buildpacks:18"
-                    }
-                  ]
-                }'
-
-          curl -n -X POST "https://api.heroku.com/apps/$HEROKU_APP_NAME/builds" \
-            -H "Authorization: Bearer $HEROKU_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{
-                  "source_blob": {
-                    "url": "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.tar.gz"
-                  }
-                }'
+        uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
+        with:
+          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
+          heroku_app_name: "video-editing"
+          heroku_email: "20110517@student.hcmute.edu.vn"
+          appdir: "./video-editing-api" # The path to your app
