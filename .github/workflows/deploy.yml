@@ -22,13 +22,14 @@ jobs:
       run: dotnet restore
 
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build --configuration Release --no-restore
 
     - name: Test
       run: dotnet test --no-build --verbosity normal
 
     - name: Publish
       run: dotnet publish --configuration Release --no-build --output ./build
+	run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
 
     - name: Deploy to Heroku
       uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
@@ -36,4 +37,4 @@ jobs:
         heroku_api_key: ${{secrets.HEROKU_API_KEY}}
         heroku_app_name: "video-editing-core" 
         heroku_email: "20110517@student.hcmute.edu.vn" 
-        appdir: "." # The path to your app
+        appdir: "./video-editing-api" # The path to your app
