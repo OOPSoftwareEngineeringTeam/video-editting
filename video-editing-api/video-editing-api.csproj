@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="11.0.0" />
+    <PackageReference Include="CloudinaryDotNet" Version="1.20.0" />
     <PackageReference Include="Google.Apis.YouTube.v3" Version="1.57.0.2735" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.9" />
     <PackageReference Include="AspNetCore.Identity.MongoDbCore" Version="3.1.2" />    

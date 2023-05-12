@@ -7,10 +7,12 @@ using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
@@ -18,6 +20,7 @@ using video_editing_api.Model.Collection;
 using video_editing_api.Model.InputModel;
 using video_editing_api.Service;
 using video_editing_api.Service.DBConnection;
+using Audio = video_editing_api.Model.InputModel.Audio;
 
 namespace video_editing_api
 {
@@ -28,10 +31,10 @@ namespace video_editing_api
         private readonly IHubContext<NotiHub> _hub;
 
         string ffmpegPath =
-            @"C:\Users\Thai Long\Downloads\ffmpeg-2023-05-04-git-4006c71d19-full_build\ffmpeg-2023-05-04-git-4006c71d19-full_build\bin\ffmpeg.exe";
+            @"./ffmpeg-2023-05-04-git-4006c71d19-full_build/ffmpeg-2023-05-04-git-4006c71d19-full_build/bin/ffmpeg.exe";
 
         string ffprobe =
-            @"C:\Users\Thai Long\Downloads\ffmpeg-2023-05-04-git-4006c71d19-full_build\ffmpeg-2023-05-04-git-4006c71d19-full_build\bin\ffprobe.exe";
+            @"./ffmpeg-2023-05-04-git-4006c71d19-full_build/ffmpeg-2023-05-04-git-4006c71d19-full_build/bin/ffprobe.exe";
 
         private readonly IWebHostEnvironment _webHostEnvironment;
 
@@ -90,23 +93,30 @@ namespace video_editing_api
                 client.Timeout = TimeSpan.FromDays(1);
                 //client.BaseAddress = new System.Uri(_baseUrl);
                 input.JsonFile.merge = 1;
+                Audio audio = input.JsonFile.audio;
                 var json = JsonConvert.SerializeObject(input.JsonFile);
                 json = json.Replace("E", "e");
                 Console.WriteLine("json " + json);
 
                 hl = _highlight.Find(hl => hl.Id == input.IdHiglight).FirstOrDefault();
 
+                string logoFile = null;
+                object objSizeLogo = null;
+                int logoX = 0;
+                int logoY = 0;
                 // process video
                 JObject config = JObject.Parse(json);
-                string inputFolder = config["inforder"].ToString();
-                string outputFolder = config["outfolder"].ToString();
-                string logoFile = config["logo"][0]["file_name"] != null
-                    ? config["logo"][0]["file_name"].ToString()
-                    : null;
-                object objSizeLogo = config["logo"][0]["size"];
-                int logoX = (int) config["logo"][0]["position"]["x"];
-                int logoY = (int) config["logo"][0]["position"]["y"];
-                bool flag = false;
+                if (config["logo"].First != null)
+                {
+                    logoFile = config["logo"][0]["file_name"] != null
+                        ? config["logo"][0]["file_name"].ToString()
+                        : null;
+                    objSizeLogo = config["logo"][0]["size"];
+                    logoX = (int) config["logo"][0]["position"]["x"];
+                    logoY = (int) config["logo"][0]["position"]["y"];
+                }
+
+                // bool flag = false;
                 string tempFilesList = "temp_files_list.txt";
                 string videoCodec = "";
                 string resolution = config["resolution"] != null ? config["resolution"].ToString() : null;
@@ -116,43 +126,26 @@ namespace video_editing_api
                 int audioBitrate = 0;
                 int width = 0;
                 int height = 0;
+                string nameFolder = Guid.NewGuid().ToString();
                 using (StreamWriter file = new StreamWriter(tempFilesList))
                 {
                     int index = 0;
-                    // check xem có video nào không logo không
-                    foreach (var eventObj in config["event"])
-                    {
-                        if (eventObj["logo"] != null && eventObj["logo"].ToString().Contains("1"))
-                        {
-                            string eventUrl = eventObj["file_name"].ToString();
-                            string eventFileName = eventUrl.Split("/")[eventUrl.Split("/").Length - 3] + ".mp4";
-                            await DownloadFileAsync(eventUrl, eventFileName);
-                            string eventOutputFileName =
-                                Path.GetFileNameWithoutExtension(eventFileName) + "_with_logo.mp4";
-                            await AddLogoToVideoAsync(config,eventFileName, eventOutputFileName, logoFile, logoX, logoY);
-                            file.WriteLine($"file '{eventOutputFileName}'");
-                            (videoCodec, audioCodec, videoBitrate, audioBitrate, width, height) =
-                                GetVideoInfo($"./{eventOutputFileName}");
-                            flag = true;
-                            break;
-                        }
-                        else
-                        {
-                        }
-                    }
+                    Directory.CreateDirectory("./Temp/" + nameFolder);
 
                     foreach (var eventObj in config["event"])
                     {
                         string eventUrl = eventObj["file_name"].ToString();
-                        string eventFileName = eventUrl.Split("/")[eventUrl.Split("/").Length - 3] + ".mp4";
+                        string eventFileName =
+                            $"./Temp/{nameFolder}/{eventUrl.Split("/")[eventUrl.Split("/").Length - 3]}.mp4";
                         await DownloadFileAsync(eventUrl, eventFileName);
-                        if (eventObj["logo"] != null && eventObj["logo"].ToString().Contains("1"))
+                        if (logoFile != null && eventObj["logo"] != null && eventObj["logo"].ToString().Contains("1"))
                         {
                             string eventOutputFileName =
                                 Path.GetFileNameWithoutExtension(eventFileName) + "_with_logo.mp4";
-                            if (!File.Exists("./" + eventOutputFileName))
+                            if (!File.Exists(eventOutputFileName))
                             {
-                                await AddLogoToVideoAsync(config,eventFileName, eventOutputFileName, logoFile, logoX, logoY);
+                                await AddLogoToVideoAsync(config, eventFileName, eventOutputFileName, logoX,
+                                    logoY,(JObject) eventObj, audio);
                                 file.WriteLine($"file '{eventOutputFileName}'");
                             }
                         }
@@ -160,44 +153,47 @@ namespace video_editing_api
                         {
                             string eventOutputFileName =
                                 Path.GetFileNameWithoutExtension(eventFileName) + "_with_no_logo.mp4";
-                            if (flag)
-                            {
-                                if (!File.Exists("./" + eventOutputFileName))
-                                {
-                                    await ConvertVideo("./" + eventFileName, "./" + eventOutputFileName, videoCodec,
-                                        audioCodec,
-                                        videoBitrate, audioBitrate, width, height);
-                                    file.WriteLine($"file '{eventOutputFileName}'");
-                                }
-                                else
-                                    file.WriteLine($"file '{eventOutputFileName}'");
-                            }
-                            else
-                                file.WriteLine($"file '{eventFileName}'");
+                            await handleNoLogo((JObject) eventObj, eventFileName, eventOutputFileName, audio, bitrate);
+                            file.WriteLine($"file '{eventOutputFileName}'");
                         }
                     }
                 }
 
                 string fileName = Guid.NewGuid().ToString() + ".mp4";
-                await MergeVideosAsync(resolution,tempFilesList, "./videos/" + fileName);
-                if (true)
-                {
-                    // ConcatResultModel model = JsonConvert.DeserializeObject<ConcatResultModel>(result);
-                    if (hl != null)                                                                                     
-                    {
-                        hl.mp4 = "https://localhost:44394/videos/" + fileName;
-                        hl.ts = "https://localhost:44394/videos/" + fileName;
-                        hl.Status = SystemConstants.HighlightStatusSucceed;
-                    }
+                await MergeVideosAsync(resolution, tempFilesList, "./videos/" + fileName, audio);
 
-                    await _highlight.ReplaceOneAsync(hl => hl.Id == input.IdHiglight, hl);
-                }
-                else
+                if (hl != null)
                 {
-                    Console.WriteLine("error server thầy" + DateTime.Now.ToString("dd-MM-yyy hh:mm:ss"));
-                    hl.Status = SystemConstants.HighlightStatusFailed;
-                    await _highlight.ReplaceOneAsync(hl => hl.Id == input.IdHiglight, hl);
+                    hl.mp4 = "https://localhost:44394/videos/" + fileName;
+                    hl.ts = "https://localhost:44394/videos/" + fileName;
+                    hl.Status = SystemConstants.HighlightStatusSucceed;
                 }
+
+                await _highlight.ReplaceOneAsync(hl => hl.Id == input.IdHiglight, hl);
+                string[] lines = File.ReadAllLines("./" + tempFilesList);
+                foreach (string line in lines)
+                {
+                    string trimmedLine = line.Trim();
+                    if (!string.IsNullOrEmpty(trimmedLine))
+                    {
+                        string filePath = trimmedLine.Replace("file '", "").Replace("'", "");
+                        try
+                        {
+                            if (File.Exists(filePath))
+                            {
+                                File.Delete(filePath);
+                                Console.WriteLine($"Deleted file: {filePath}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Failed to delete file: {filePath}. Error: {ex.Message}");
+                        }
+                    }
+                }
+
+                await DeleteWithDelay("./Temp/" + nameFolder, 2);
+                // Directory.Delete("./Temp/" + nameFolder, true);
             }
             catch (Exception ex)
             {
@@ -210,56 +206,108 @@ namespace video_editing_api
             return JsonConvert.SerializeObject(hl);
         }
 
-        private async Task ConvertVideo(string input, string output, string videoCodec, string audioCodec,
-            int videoBitrate,
-            int audioBitrate, int width, int height)
+        async Task DeleteWithDelay(string path, int sec)
         {
-            if (File.Exists($"{output}"))
-            {
-                return;
-            }
-
-            string args =
-                $"-i {input} -c:v {videoCodec} -c:a {audioCodec} -b:v {videoBitrate}k -b:a {audioBitrate}k -s {width}x{height} {output}";
-            await ExecuteFFmpegAsync(args);
+            await Task.Delay(sec * 1000);
+            Directory.Delete(path, true);
         }
 
-        private async Task AddLogoToVideoAsync(JObject config , string inputFile, string outputFile, string logoFile, int x, int y)
+        private async Task handleNoLogo(JObject eventObj, string eventFileName, string eventOutputFileName, Audio audio, string bitrate)
         {
-            if (File.Exists($"./{outputFile}"))
+            string timeLine = "";
+            if (eventObj["ts"] != null && eventObj["ts"].ToArray().Length > 0)
+            {
+                TimeSpan startTime = TimeSpan.FromSeconds((int) eventObj["ts"][0]);
+                TimeSpan endTime = TimeSpan.FromSeconds((int) eventObj["ts"][1]);
+                TimeSpan duration = endTime - startTime;
+                timeLine = $"-ss {startTime} -t {duration} ";
+            }
+            string arguments;
+            if (audio == null)
+                arguments =
+                    $"-hwaccel cuda -i \"{eventFileName}\" {timeLine} -map 0:v -map 0:a -c:v libx264 -b:v {bitrate} -crf 23 -preset veryfast -c:a copy \"{eventOutputFileName}\"";
+            else
+                arguments =
+                    $"-hwaccel cuda -i \"{eventFileName}\" {timeLine} -map 0:v -map 0:a -c:v libx264 -b:v {bitrate} -crf 23 -preset veryfast -an \"{eventOutputFileName}\"";
+            await ExecuteFFmpegAsync(arguments);
+        }
+
+
+        private async Task AddLogoToVideoAsync(JObject config, string inputFile, string outputFile,
+            int x, int y, JObject eventObj, Audio audio)
+        {
+            if (File.Exists(outputFile))
             {
                 return;
             }
 
             string arguments;
-            if (config["logo"][0] != null && config["logo"][0]["size"] != null)
-            { 
-                String width = config["logo"][0]["size"][0].ToString();
-                String height =  config["logo"][0]["size"][1].ToString();
-                arguments =
-                    $"-hwaccel cuda -i \"{inputFile}\" -i \"{logoFile}\" -filter_complex \"[0:v]scale=1920:1080[bg];[1:v]scale={width}:{height}[logo_resized];[bg][logo_resized]overlay={x}:{y}\" -c:v libx264 -crf 23 -preset veryfast -c:a copy \"{outputFile}\"";
+            string targetBitrate = $"{config["bitrate"].ToString()}k";
 
+            string timeLine = "";
+            if (eventObj["ts"] != null && eventObj["ts"].ToArray().Length > 0)
+            {
+                TimeSpan startTime = TimeSpan.FromSeconds((int) eventObj["ts"][0]);
+                TimeSpan endTime = TimeSpan.FromSeconds((int) eventObj["ts"][1]);
+                TimeSpan duration = endTime - startTime;
+                timeLine = $"-ss {startTime} -t {duration} ";
+            }
+            if (config["logo"].First != null)
+            {
+                string overlayFilters = "[0:v]scale=1920:1080,format=yuv420p[bg];";
+                string inputFilters = $"-i \"{inputFile}\" ";
+                for (int i = 0; i < config["logo"].Count(); i++)
+                {
+                    var logo = config["logo"][i];
+                    var logoFile = logo["file_name"].ToString();
+                    var xLogo = logo["position"]["x"];
+                    var yLogo = logo["position"]["y"];
+                    var width = logo["size"][0];
+                    var height = logo["size"][1];
+
+                    inputFilters += $"-i \"{logoFile}\" ";
+                    overlayFilters += $"[{i + 1}:v]scale={width}:{height}[logo{i}];";
+                    overlayFilters += $"[bg][logo{i}]overlay={xLogo}:{yLogo}[bg];";
+                }
+
+                overlayFilters = overlayFilters.TrimEnd(';');
+                if (audio == null)
+                    arguments =
+                        $"-hwaccel cuda {inputFilters} -filter_complex \"{overlayFilters}\" {timeLine} -map \"[bg]\" -map 0:a -c:v libx264 -b:v {targetBitrate} -crf 23 -preset veryfast -c:a copy \"{outputFile}\"";
+                else
+                    arguments =
+                        $"-hwaccel cuda {inputFilters} -filter_complex \"{overlayFilters}\" {timeLine} -map \"[bg]\" -c:v libx264 -b:v {targetBitrate} -crf 23 -preset veryfast -an \"{outputFile}\"";
             }
             else
-            // string arguments = $"-hwaccel cuda -i \"{inputFile}\" -i \"{logoFile}\" -filter_complex \"[0:v][1:v]overlay=340:398\" -c:v libx264 -crf 23 -preset veryfast -c:a copy \"{outputFile}\"";
-             arguments =
-                 $"-hwaccel cuda -i \"{inputFile}\" -i \"{logoFile}\" -filter_complex \"[0:v]scale=1920:1080[bg];[1:v][bg]overlay={x}:{y}\" -c:v libx264 -crf 23 -preset veryfast -c:a copy \"{outputFile}\"";
+            {
+                if (audio == null)
+                    arguments =
+                        $"-hwaccel cuda -i \"{inputFile}\" -ss {timeLine} -filter_complex \"[0:v]scale=1920:1080[bg];[bg]overlay={x}:{y}\" -c:v libx264 -b:v {targetBitrate} -crf 23 -preset veryfast -an \"{outputFile}\"";
+                else
+                    arguments =
+                        $"-hwaccel cuda -i \"{inputFile}\" -ss {timeLine} -filter_complex \"[0:v]scale=1920:1080[bg];[1:v][bg]overlay={x}:{y}\" -c:v libx264 -b:v {targetBitrate} -crf 23 -preset veryfast -c:a copy \"{outputFile}\"";
+            }
 
             await ExecuteFFmpegAsync(arguments);
         }
 
-        private async Task MergeVideosAsync(string resolution ,string fileList, string outputFile)
+
+        private async Task MergeVideosAsync(string resolution, string fileList, string outputFile, Audio audio)
         {
-            string arguments = resolution != null ?  $"-f concat -safe 0 -hwaccel cuda -i \"{fileList}\" -vf \"scale={resolution.Split(":")[0].ToString()}:{resolution.Split(":")[1].ToString()}\" -c:v libx264 -crf 23 -preset veryfast -c:a copy \"{outputFile}\""
-                : $"-f concat -safe 0 -hwaccel cuda -i \"{fileList}\" -c copy \"{outputFile}\"" 
-                ;
-            // $"-f concat -safe 0 -i \"{fileList}\" -filter:v \"scale=1920:1080\" -c:v libx264 -crf 23 -preset veryfast -c:a copy \"{outputFile}\"";
+            string duration = audio != null ? (audio.endTime - audio.startTime).ToString() : "";
+            string audioInput = audio != null ? $"-ss {audio.startTime} -t {duration} -i \"{audio.file_name}\"" : "";
+            string mapOption = audio != null ? "-map 0:v -map 1:a" : "-map 0";
+
+            string arguments = resolution != null
+                ? $"-f concat -safe 0 -hwaccel cuda -i \"{fileList}\" {audioInput} -vf \"scale={resolution.Split(":")[0].ToString()}:{resolution.Split(":")[1].ToString()}\" -c:v libx264 {mapOption} -crf 23 -preset veryfast -c:a copy \"{outputFile}\""
+                : $"-f concat -safe 0 -hwaccel cuda -i \"{fileList}\" {audioInput} {mapOption} -c copy \"{outputFile}\"";
+
             await ExecuteFFmpegAsync(arguments);
         }
-    
+
         private async Task DownloadFileAsync(string url, string fileName)
         {
-            if (File.Exists($"./{fileName}"))
+            if (File.Exists(fileName))
             {
                 return;
             }
@@ -277,9 +325,6 @@ namespace video_editing_api
         private (string videoCodec, string audioCodec, int videoBitrate, int audioBitrate, int width, int height)
             GetVideoInfo(string videoPath)
         {
-            string ffprobe =
-                @"C:\Users\Thai Long\Downloads\ffmpeg-2023-05-04-git-4006c71d19-full_build\ffmpeg-2023-05-04-git-4006c71d19-full_build\bin\ffprobe.exe"; // Make sure ffprobe is in your system PATH
-
             Process process = new Process
             {
                 StartInfo = new ProcessStartInfo

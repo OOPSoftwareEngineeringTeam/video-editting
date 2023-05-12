@@ -23,10 +23,13 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 using video_editing_api.Model.Collection;
 using video_editing_api.Model.InputModel;
 using video_editing_api.Model.InputModel.Youtube;
 using video_editing_api.Service.DBConnection;
+using Video = Google.Apis.YouTube.v3.Data.Video;
 
 
 namespace video_editing_api.Service.VideoEditing
@@ -39,7 +42,7 @@ namespace video_editing_api.Service.VideoEditing
         private readonly IMongoCollection<TagEvent> _tagEvent;
         private readonly IMongoCollection<TeamOfLeague> _teamOfLeague;
         private readonly IMongoCollection<Gallery> _gallery;
-
+        private readonly Cloudinary _cloudinary;
         private readonly IHubContext<NotiHub> _hub;
         private readonly IMapper _mapper;
         private IHttpClientFactory _clientFactory;
@@ -61,7 +64,12 @@ namespace video_editing_api.Service.VideoEditing
             _config = config;
             _hub = hub;
             _pathClientSecret = Path.Combine(webHostEnvironment.ContentRootPath, "Cert", "client_secret.json");
+            var account = new Account(
+                config["Cloudinary:CloudName"],
+                config["Cloudinary:ApiKey"],
+                config["Cloudinary:ApiSecret"]);
 
+            _cloudinary = new Cloudinary(account);
             _mapper = mapper;
         }
 
@@ -185,25 +193,24 @@ namespace video_editing_api.Service.VideoEditing
                 var jsonBody = new
                 {
                     match_id = matchInfo.Id
-                };
-
-                HttpClient client = new HttpClient();
-                client.Timeout = TimeSpan.FromDays(1);
-                client.BaseAddress = new System.Uri("http://118.69.218.59:7007");
-                var json = JsonConvert.SerializeObject(jsonBody);
-                try
-                {
-                    var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync("/savematch", httpContent);
-                    if (response.IsSuccessStatusCode)
-                        return "Succeed";
-                    else
-                        throw new System.Exception(response.Content.ReadAsStringAsync().Result);
-                }
-                catch (System.Exception ex)
-                {
-                    throw new System.Exception(ex.Message);
-                }
+                };return "Succeed";
+                // HttpClient client = new HttpClient();
+                // client.Timeout = TimeSpan.FromDays(1);
+                // client.BaseAddress = new System.Uri("http://118.69.218.59:7007");
+                // var json = JsonConvert.SerializeObject(jsonBody);
+                // try
+                // {
+                //     var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+                //     var response = await client.PostAsync("/savematch", httpContent);
+                //     if (response.IsSuccessStatusCode)
+                //         return "Succeed";
+                //     else
+                //         throw new System.Exception(response.Content.ReadAsStringAsync().Result);
+                // }
+                // catch (System.Exception ex)
+                // {
+                //     throw new System.Exception(ex.Message);
+                // }
             }
             catch (System.Exception e)
             {
@@ -426,30 +433,30 @@ namespace video_editing_api.Service.VideoEditing
                 var mergeQueue = new MergeQueueInput(inputSend, hl.Id, username, 1);
                 BackgroundQueue.MergeQueue.Enqueue(mergeQueue);
 
-                //Thread thead = new Thread(async () =>
-                //{
-                //    Console.WriteLine("start thread");
-                //    try
-                //    {
-                //        HttpClient client = new HttpClient();
-                //        client.Timeout = TimeSpan.FromDays(1);
-                //        client.BaseAddress = new System.Uri("http://118.69.218.59:7007");
-                //        var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
-                //        var response = await client.PostAsync("/highlight_nomerge", httpContent);
-                //        var result = await response.Content.ReadAsStringAsync();
-
-                //        var listRes = JsonConvert.DeserializeObject<NotConcatResultModel>(result);
-                //        await _hub.Clients.Group(username).SendAsync("not_merge", "background_task", JsonConvert.SerializeObject(listRes.mp4));
-
-                //    }
-                //    catch (System.Exception ex)
-                //    {
-                //        Console.WriteLine(ex.Message);
-                //    }
-                //    Console.WriteLine("stop thread");
-                //});
-                //thead.IsBackground = true;
-                //thead.Start();
+                // Thread thead = new Thread(async () =>
+                // {
+                //     Console.WriteLine("start thread");
+                //     try
+                //     {
+                //         HttpClient client = new HttpClient();
+                //         client.Timeout = TimeSpan.FromDays(1);
+                //         client.BaseAddress = new System.Uri("http://118.69.218.59:7007");
+                //         var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+                //         var response = await client.PostAsync("/highlight_nomerge", httpContent);
+                //         var result = await response.Content.ReadAsStringAsync();
+                //
+                //         var listRes = JsonConvert.DeserializeObject<NotConcatResultModel>(result);
+                //         await _hub.Clients.Group(username).SendAsync("not_merge", "background_task", JsonConvert.SerializeObject(listRes.mp4));
+                //
+                //     }
+                //     catch (System.Exception ex)
+                //     {
+                //         Console.WriteLine(ex.Message);
+                //     }
+                //     Console.WriteLine("stop thread");
+                // });
+                // thead.IsBackground = true;
+                // thead.Start();
                 return null;
             }
             catch (System.Exception ex)
@@ -552,8 +559,8 @@ namespace video_editing_api.Service.VideoEditing
                     };
                     if (item.ts != null && item.ts.Count > 0)
                     {
-                        eventt.ts.Add((int) (item.ts[0] + item.startTime));
-                        eventt.ts.Add((int) (item.ts[0] + item.endTime));
+                        eventt.ts.Add((int) (item.startTime));
+                        eventt.ts.Add((int) (item.endTime));
                     }
 
                     eventSrc.Add(eventt);
@@ -782,7 +789,7 @@ namespace video_editing_api.Service.VideoEditing
                     Height = input.Height,
                     Width = input.Width
                 };
-                gallery.file_name = await UploadToServerStorage(input.File);
+                gallery.file_name = await UploadToLocal(input.File);
                 await _gallery.InsertOneAsync(gallery);
                 return "success";
             }
@@ -791,7 +798,49 @@ namespace video_editing_api.Service.VideoEditing
                 throw new System.Exception(ex.Message);
             }
         }
+        public async Task<string> UploadToLocal(IFormFile file)
+        {
+            if (file == null)
+            {
+                throw new System.Exception("File is null.");
+            }
 
+            var uploadsFolder = "./videos/gallery";
+            if (!Directory.Exists("./videos/gallery"))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            var uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(fileStream);
+            }
+
+            return "https://localhost:44394/videos/gallery/" + uniqueFileName;
+        }
+        public async Task<string> UploadToCloudinary(IFormFile file)
+        {
+            if (file == null) throw new System.Exception("File is null.");
+
+            var uploadParams = new RawUploadParams
+            {
+                File = new FileDescription(file.FileName, file.OpenReadStream()),
+                UseFilename = true,
+                UniqueFilename = true
+            };
+
+            var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+
+            if (uploadResult.Error != null)
+            {
+                throw new System.Exception(uploadResult.Error.Message);
+            }
+
+            return uploadResult.SecureUrl.AbsoluteUri;
+        }
         private async Task<string> UploadToServerStorage(IFormFile file)
         {
             try
@@ -838,7 +887,7 @@ namespace video_editing_api.Service.VideoEditing
                 inputSendServer.Event = input.Event;
                 //if (input.Logo.Count == 0) input.Logo.Add(new List<string>());
                 inputSendServer.logo = input.Logo;
-
+                inputSendServer.audio = input.audio;
 
                 var inputSend = handlePreSendServer(inputSendServer);
 

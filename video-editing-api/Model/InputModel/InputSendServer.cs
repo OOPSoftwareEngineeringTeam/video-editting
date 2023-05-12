@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using CloudinaryDotNet.Actions;
 
 namespace video_editing_api.Model.InputModel
 {
@@ -17,6 +18,7 @@ namespace video_editing_api.Model.InputModel
         public string aspect_ratio { get; set; } = string.Empty;
         public string resolution { get; set; } = string.Empty;
         public string bitrate { get; set; } = string.Empty;
+        public Audio audio { get; set; }
         public int merge { get; set; }
         public List<Logo> logo { get; set; }
     }
