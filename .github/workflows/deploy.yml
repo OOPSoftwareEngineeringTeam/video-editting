@@ -28,8 +28,7 @@ jobs:
       run: dotnet test --no-build --verbosity normal
 
     - name: Publish
-      # run: dotnet publish --configuration Release --no-build --output ./build
-	    run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
+      run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
 
     - name: Deploy to Heroku
       uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
