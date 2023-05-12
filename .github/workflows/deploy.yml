@@ -1,40 +1,43 @@
-name: Deploy .NET App to Heroku
+name: Deploy to Heroku
 
 on:
   push:
     branches:
-      - main # Change this to your default branch
+      - main # or your default branch
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 5.0.x
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
-
-      - name: Test
-        run: dotnet test --no-build --verbosity normal
-
-      - name: Publish
-        run: dotnet publish --configuration Release --no-build --output ./video-editing-api/build
-
-      - name: Deploy to Heroku
-        uses: jctaveras/heroku-deploy@v1.0.8
+      - name: Login to Heroku Container registry
         env:
           HEROKU_API_KEY: ${{secrets.HEROKU_API_KEY}}
-          HEROKU_APP_NAME: "video-editing-core"
-          HEROKU_EMAIL: "20110517@student.hcmute.edu.vn"
-        with:
-          args: --app-dir . --buildpack heroku/dotnet
+        run: docker login --username=_ --password=$HEROKU_API_KEY registry.heroku.com
+
+      - name: Build and push Docker image
+        env:
+          HEROKU_APP_NAME: video-editing-core
+        run: |
+          docker build -t registry.heroku.com/$HEROKU_APP_NAME/web .
+          docker push registry.heroku.com/$HEROKU_APP_NAME/web
+
+      - name: Deploy to Heroku
+        env:
+          HEROKU_API_KEY: ${{secrets.HEROKU_API_KEY}}
+          HEROKU_APP_NAME: your-heroku-app-name
+        run: |
+          curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
+          -d '{
+            "updates": [
+              {
+                "type": "web",
+                "docker_image": "'"$(docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}})"'"
+              }
+            ]
+          }' \
+          -H "Content-Type: application/json" \
+          -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
+          -H "Authorization: Bearer $HEROKU_API_KEY"
