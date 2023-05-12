@@ -36,4 +36,4 @@ jobs:
         heroku_api_key: ${{secrets.HEROKU_API_KEY}}
         heroku_app_name: "video-editing-core"
         heroku_email: "20110517@student.hcmute.edu.vn"
-        appdir: "./video-editing-api" # The path to your app
+        appdir: "." # The path to your app
